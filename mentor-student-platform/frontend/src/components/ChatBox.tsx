@@ -8,7 +8,6 @@ interface Message {
   timestamp: string;
   role: 'mentor' | 'student';
 }
-
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
