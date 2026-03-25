@@ -104,7 +104,16 @@ io.on("connection", (socket) => {
       timestamp: new Date(),
     });
 
-    callback({ success: true, message: "Joined session" });
+    const sessionUsers = activeSessions.get(validSessionId) || [];
+    const userCount = sessionUsers.length;
+    const isInitiator = userCount === 1; // first user in room waits for offer
+
+    callback({
+      success: true,
+      message: "Joined session",
+      userCount,
+      isInitiator,
+    });
   });
 
   // ✅ WebRTC: Offer
@@ -184,7 +193,10 @@ io.on("connection", (socket) => {
 
   // ✅ Chat: Send message with validation
   socket.on("chat-message", (message, callback) => {
+    console.log("CHAT RECEIVED:", message);
+
     const sessionId = userSessions.get(socket.id);
+    console.log("SESSION:", sessionId);
     if (!sessionId) {
       return callback({ success: false, error: "Not in session" });
     }
@@ -197,6 +209,7 @@ io.on("connection", (socket) => {
       }
 
       const msgData = {
+        id: uuidv4(),
         userId: socket.userId,
         userName: socket.userName,
         message: sanitizedMsg,

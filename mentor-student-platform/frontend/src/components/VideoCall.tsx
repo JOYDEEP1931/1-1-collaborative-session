@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { initializeSocket, getSocket, disconnectSocket } from "../lib/socket";
+import { getSocket } from "../lib/socket";
 import {
   initializeWebRTC,
   createOffer,
@@ -15,45 +15,32 @@ interface VideoCallProps {
   token: string;
 }
 
-export default function VideoCall({ sessionId, token }: VideoCallProps) {
+export default function VideoCall({ sessionId }: VideoCallProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  const [isInitialized, setIsInitialized] = useState(false);
   const [isAudioOn, setIsAudioOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [error, setError] = useState<string | null>(null);
 
+  const isInitiatorRef = useRef<boolean>(true);
+  const offerCreatedRef = useRef<boolean>(false);
+
   useEffect(() => {
     let isMounted = true;
+    const socket = getSocket();
 
     const initializeCall = async () => {
       try {
         setError(null);
 
-        const socket = initializeSocket(token);
-
-        socket.emit("join-session", sessionId, (response: any) => {
-          if (!response.success) {
-            if (isMounted) setError(response.error || "Failed to join session");
-            return;
-          }
-          if (isMounted) console.log("✅ Joined session:", sessionId);
-        });
-
-        if (!socket.connected) {
-          await new Promise<void>((resolve) => {
-            socket.once("connect", () => resolve());
-          });
-        }
-
         if (localVideoRef.current && remoteVideoRef.current) {
-          await initializeWebRTC(localVideoRef.current, remoteVideoRef.current);
-          if (isMounted) setIsInitialized(true);
+          await initializeWebRTC(
+            localVideoRef.current,
+            remoteVideoRef.current
+          );
         }
-
-        await createOffer();
 
         socket.on("webrtc-offer", async (data: any) => {
           try {
@@ -88,30 +75,28 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
           }
         });
 
-        socket.on("user-joined", (data: any) => {
-          console.log("👤 User joined:", data.userId);
-        });
+        socket.on("user-joined", async () => {
+          console.log("👤 User joined session");
 
-        socket.on("user-disconnected", (data: any) => {
-          console.log("👤 User disconnected:", data.userId);
-          if (isMounted) setConnectionStatus("disconnected");
-        });
-
-        socket.on("connection-status", (data: any) => {
-          console.log("🔌 Connection status:", data.state);
-          if (isMounted) {
-            if (data.state === "connected") {
-              setConnectionStatus("connected");
-            } else if (data.state === "failed" || data.state === "closed") {
-              setConnectionStatus("disconnected");
+          if (!offerCreatedRef.current) {
+            try {
+              offerCreatedRef.current = true;
+              await createOffer();
+            } catch (err) {
+              console.error("Error creating offer:", err);
             }
           }
         });
+
+        socket.on("user-disconnected", () => {
+          console.log("👤 User disconnected");
+          if (isMounted) setConnectionStatus("disconnected");
+        });
       } catch (err) {
         if (isMounted) {
-          const errorMsg = err instanceof Error ? err.message : "Unknown error";
+          const errorMsg =
+            err instanceof Error ? err.message : "Unknown error";
           setError(errorMsg);
-          console.error("Failed to initialize call:", err);
         }
       }
     };
@@ -121,9 +106,13 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
     return () => {
       isMounted = false;
       cleanupWebRTC();
-      disconnectSocket();
+      socket.off("webrtc-offer");
+      socket.off("webrtc-answer");
+      socket.off("webrtc-candidate");
+      socket.off("user-joined");
+      socket.off("user-disconnected");
     };
-  }, [sessionId, token]);
+  }, [sessionId]);
 
   const handleToggleAudio = () => {
     const newState = !isAudioOn;
@@ -138,16 +127,8 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
   };
 
   const handleEndCall = () => {
-    const socket = getSocket();
-    if (socket) {
-      socket.emit("leave-session", (response: any) => {
-        if (response.success) {
-          console.log("✅ Left session");
-        }
-      });
-    }
     cleanupWebRTC();
-    disconnectSocket();
+    setConnectionStatus("disconnected");
   };
 
   return (
@@ -176,12 +157,13 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-gray-900 bg-opacity-70 px-2 py-1 rounded text-sm text-white">
-            {connectionStatus === "connected" ? "Connected" : "Waiting..."}
+            {connectionStatus === "connected"
+              ? "Connected"
+              : "Waiting..."}
           </div>
         </div>
       </div>
 
-      {/* Status & Error Display */}
       {error && (
         <div className="mb-4 p-3 bg-red-500 bg-opacity-20 border border-red-500 rounded text-red-200 text-sm">
           {error}
@@ -192,36 +174,28 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
         Status: <span className="font-semibold">{connectionStatus}</span>
       </div>
 
-      {/* Controls */}
       <div className="flex justify-center gap-4">
         <button
           onClick={handleToggleAudio}
-          className={`p-3 rounded-full transition-colors text-xl ${
-            isAudioOn
-              ? "bg-blue-600 hover:bg-blue-700"
-              : "bg-red-600 hover:bg-red-700"
+          className={`p-3 rounded-full text-xl ${
+            isAudioOn ? "bg-blue-600" : "bg-red-600"
           }`}
-          title="Toggle audio"
         >
           {isAudioOn ? "🎤" : "🔇"}
         </button>
 
         <button
           onClick={handleToggleVideo}
-          className={`p-3 rounded-full transition-colors text-xl ${
-            isVideoOn
-              ? "bg-blue-600 hover:bg-blue-700"
-              : "bg-red-600 hover:bg-red-700"
+          className={`p-3 rounded-full text-xl ${
+            isVideoOn ? "bg-blue-600" : "bg-red-600"
           }`}
-          title="Toggle video"
         >
           {isVideoOn ? "📹" : "📴"}
         </button>
 
         <button
           onClick={handleEndCall}
-          className="p-3 bg-red-600 hover:bg-red-700 rounded-full transition-colors text-xl"
-          title="End call"
+          className="p-3 bg-red-600 rounded-full text-xl"
         >
           ☎️
         </button>

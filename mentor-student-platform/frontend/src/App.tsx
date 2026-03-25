@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import VideoCall from './components/VideoCall';
 import ChatBox from './components/ChatBox';
 import CodeEditor from './components/CodeEditor';
 import axios, { AxiosError } from 'axios';
+import { initializeSocket, disconnectSocket } from "./lib/socket";
 
 function App() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -13,6 +14,33 @@ function App() {
   const [joinSessionId, setJoinSessionId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const [socketReady, setSocketReady] = useState(false);
+  // 🔴 VERY IMPORTANT — JOIN SESSION HERE
+  useEffect(() => {
+  if (!token || !sessionId) return;
+
+  const socket = initializeSocket(token);
+
+  socket.on("connect", () => {
+    console.log("Socket connected:", socket.id);
+
+    socket.emit("join-session", sessionId, (response: any) => {
+      console.log("Join session response:", response);
+      setSocketReady(true);
+    });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected");
+    setSocketReady(false);
+  });
+
+  return () => {
+    socket.emit("leave-session");
+    disconnectSocket();
+  };
+}, [token, sessionId]);
 
   const handleStartSession = async (role: 'mentor' | 'student', name: string) => {
     if (!name.trim()) {
@@ -91,7 +119,7 @@ function App() {
     setError(null);
   };
 
-  if (token && sessionId) {
+  if (token && sessionId && socketReady) {
     return (
       <div className="w-full h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6">
         <div className="h-full flex flex-col">
@@ -99,7 +127,7 @@ function App() {
             <div>
               <h1 className="text-3xl font-bold text-white">Mentor-Student Session</h1>
               <p className="text-gray-400 mt-1">
-                Session ID: <span className="text-blue-400 font-mono">{sessionId.substring(0, 8)}...</span>
+                Session ID: <span className="text-blue-400 font-mono">{sessionId}</span>
               </p>
               <p className="text-gray-400">
                 Role: <span className="text-green-400 font-semibold">{userRole.toUpperCase()}</span>
@@ -108,10 +136,8 @@ function App() {
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-              title="Logout"
             >
-              <span className="text-xl">🚪</span>
-              Logout
+              🚪 Logout
             </button>
           </div>
 

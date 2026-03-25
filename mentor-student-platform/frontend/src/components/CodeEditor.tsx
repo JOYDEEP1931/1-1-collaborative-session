@@ -48,8 +48,12 @@ export default function CodeEditor() {
   const throttledEmitCodeUpdate = useRef(
     throttle((codeData: { code: string; language: string }) => {
       const socket = getSocket();
-      if (!socket) return;
+      if (!socket || !socket.connected) {
+        console.warn("⚠️  Socket not connected, cannot emit code update");
+        return;
+      }
 
+      console.log("📤 Emitting code update...");
       socket.emit("code-update", codeData, (response: any) => {
         if (!response.success) {
           setError(response.error || "Failed to sync code");
@@ -61,50 +65,57 @@ export default function CodeEditor() {
   ).current;
 
   useEffect(() => {
-    // Retry getting socket if not available yet
-    let socket = getSocket();
-    let retries = 0;
-    const maxRetries = 10;
+  let socket: any;
+  let handleCodeUpdate: any;
 
-    const setupListener = () => {
+  const setupListener = async () => {
+    let retries = 0;
+    const maxRetries = 15;
+
+    while (retries < maxRetries) {
       socket = getSocket();
-      if (!socket && retries < maxRetries) {
-        retries++;
-        setTimeout(setupListener, 500);
+      if (socket && socket.connected) {
+        console.log("📝 Socket ready, setting up code-update listener");
+
+        handleCodeUpdate = (update: CodeUpdate) => {
+          console.log("📨 Received code update from", update.userName);
+          setIsRemoteUpdate(true);
+          setCode(update.code);
+          setLanguage(update.language);
+          setLastUpdatedBy(update.userName);
+          setLastUpdateTime(new Date(update.timestamp).toLocaleTimeString());
+
+          if (updateTimeoutRef.current) {
+            clearTimeout(updateTimeoutRef.current);
+          }
+          updateTimeoutRef.current = setTimeout(() => {
+            setIsRemoteUpdate(false);
+          }, 100);
+        };
+
+        socket.off("code-update");
+        socket.on("code-update", handleCodeUpdate);
         return;
       }
 
-      if (!socket) return;
+      retries++;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
 
-      const handleCodeUpdate = (update: CodeUpdate) => {
-        setIsRemoteUpdate(true);
-        setCode(update.code);
-        setLanguage(update.language);
-        setLastUpdatedBy(update.userName);
-        setLastUpdateTime(new Date(update.timestamp).toLocaleTimeString());
+    console.warn("⚠️ Failed to set up code listener after retries");
+  };
 
-        if (updateTimeoutRef.current) {
-          clearTimeout(updateTimeoutRef.current);
-        }
-        updateTimeoutRef.current = setTimeout(() => {
-          setIsRemoteUpdate(false);
-        }, 100);
-      };
+  setupListener();
 
-      console.log("📝 Setting up code-update listener");
-      socket.on("code-update", handleCodeUpdate);
-
-      return () => {
-        socket?.off("code-update", handleCodeUpdate);
-        if (updateTimeoutRef.current) {
-          clearTimeout(updateTimeoutRef.current);
-        }
-      };
-    };
-
-    const cleanup = setupListener();
-    return cleanup;
-  }, []);
+  return () => {
+    if (socket && handleCodeUpdate) {
+      socket.off("code-update", handleCodeUpdate);
+    }
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+  };
+}, []);
 
   const handleCodeChange = (value: string | undefined) => {
     if (isRemoteUpdate) return;
@@ -124,11 +135,14 @@ export default function CodeEditor() {
     setLanguage(newLanguage);
 
     const socket = getSocket();
-    if (socket) {
+    if (socket && socket.connected) {
+      console.log("🔄 Emitting code update with language:", newLanguage);
       socket.emit("code-update", {
         code: code,
         language: newLanguage,
       });
+    } else {
+      console.warn("⚠️  Socket not connected, cannot emit code update");
     }
   };
 
@@ -136,11 +150,14 @@ export default function CodeEditor() {
     if (confirm("Are you sure? This will clear the code for both users.")) {
       setCode("");
       const socket = getSocket();
-      if (socket) {
+      if (socket && socket.connected) {
+        console.log("🗑️ Clearing code");
         socket.emit("code-update", {
           code: "",
           language: language,
         });
+      } else {
+        console.warn("⚠️  Socket not connected, cannot emit code update");
       }
     }
   };

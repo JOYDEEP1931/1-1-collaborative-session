@@ -1,52 +1,88 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { getSocket } from '../lib/socket';
+import React, { useState, useEffect, useRef } from "react";
+import { getSocket } from "../lib/socket";
 
 interface Message {
+  id: string;
   userId: string;
   userName: string;
   message: string;
   timestamp: string;
-  role: 'mentor' | 'student';
+  role: "mentor" | "student";
 }
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageIdsRef = useRef<Set<string>>(new Set());
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+ useEffect(() => {
+  let socket: any;
+  let handleMessage: any;
 
-    const handleMessage = (msgData: Message) => {
-      setMessages((prev) => [...prev, msgData]);
-      setError(null);
-    };
+  const setupListener = async () => {
+    let retries = 0;
+    const maxRetries = 15;
 
-    socket.on('chat-message', handleMessage);
+    while (retries < maxRetries) {
+      socket = getSocket();
+      if (socket && socket.connected) {
+        console.log("💬 Socket ready, setting up chat listener");
 
-    return () => {
-      socket.off('chat-message', handleMessage);
-    };
-  }, []);
+        handleMessage = (msgData: Message) => {
+          if (!msgData.id) {
+            msgData.id = `${msgData.userId}-${msgData.timestamp}-${Math.random()}`;
+          }
+
+          if (messageIdsRef.current.has(msgData.id)) {
+            console.warn("⚠️ Duplicate message ignored", msgData.id);
+            return;
+          }
+
+          messageIdsRef.current.add(msgData.id);
+          console.log("MESSAGE RECEIVED:", msgData);
+          setMessages((prev) => [...prev, msgData]);
+          setError(null);
+        };
+
+        socket.off("chat-message", handleMessage);
+        socket.on("chat-message", handleMessage);
+        return;
+      }
+
+      retries++;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    console.warn("⚠️ Failed to set up chat listener after retries");
+  };
+
+  setupListener();
+
+  return () => {
+    if (socket && handleMessage) {
+      socket.off("chat-message", handleMessage);
+    }
+  };
+}, []);
 
   const validateMessage = (msg: string): boolean => {
     if (!msg || msg.trim().length === 0) {
-      setError('Message cannot be empty');
+      setError("Message cannot be empty");
       return false;
     }
 
     if (msg.length > 1000) {
-      setError('Message is too long (max 1000 characters)');
+      setError("Message is too long (max 1000 characters)");
       return false;
     }
 
@@ -58,33 +94,42 @@ export default function ChatBox() {
     if (!validateMessage(input)) return;
 
     const socket = getSocket();
-    if (!socket) {
-      setError('Socket not connected');
+    if (!socket || !socket.connected) {
+      setError("Socket not connected");
+      console.warn("⚠️  Cannot send message - socket not connected");
       return;
     }
 
     try {
       setIsLoading(true);
       const sanitizedMessage = input.trim();
+      console.log("💬 Sending message:", sanitizedMessage);
 
-      socket.emit('chat-message', sanitizedMessage, (response: { success: boolean; error?: string }) => {
-        if (response.success) {
-          setInput('');
-          setError(null);
-          //setMessages((prev) => [...prev, response.data]);
-        } else {
-          setError(response.error || 'Failed to send message');
-        }
-        setIsLoading(false);
-      });
+      socket.emit(
+  "chat-message",
+  sanitizedMessage,
+  (response: { success: boolean; error?: string }) => {
+    console.log("📩 Server response:", response);   // ADD THIS
+
+    if (response.success) {
+      console.log("✅ Message sent successfully");
+      setInput("");
+      setError(null);
+    } else {
+      console.error("❌ Failed to send message:", response.error);
+      setError(response.error || "Failed to send message");
+    }
+    setIsLoading(false);
+  },
+);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      setError(err instanceof Error ? err.message : "Failed to send message");
       setIsLoading(false);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
@@ -99,36 +144,36 @@ export default function ChatBox() {
             No messages yet. Start the conversation!
           </div>
         ) : (
-          messages.map((msg, idx) => (
+          messages.map((msg) => (
             <div
-              key={idx}
+              key={msg.id}
               className={`flex gap-2 ${
-                msg.role === 'mentor' ? 'flex-row-reverse' : 'flex-row'
+                msg.role === "mentor" ? "flex-row-reverse" : "flex-row"
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  msg.role === 'mentor'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-green-600 text-white'
+                  msg.role === "mentor"
+                    ? "bg-blue-600 text-white"
+                    : "bg-green-600 text-white"
                 }`}
               >
-                {msg.role === 'mentor' ? 'M' : 'S'}
+                {msg.role === "mentor" ? "M" : "S"}
               </div>
 
               <div
                 className={`flex-1 max-w-xs px-3 py-2 rounded-lg ${
-                  msg.role === 'mentor'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-green-600 text-white'
+                  msg.role === "mentor"
+                    ? "bg-blue-600 text-white"
+                    : "bg-green-600 text-white"
                 }`}
               >
                 <p className="text-xs font-semibold mb-1">{msg.userName}</p>
                 <p className="text-sm break-words">{msg.message}</p>
                 <span className="text-xs opacity-70">
                   {new Date(msg.timestamp).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
+                    hour: "2-digit",
+                    minute: "2-digit",
                   })}
                 </span>
               </div>
