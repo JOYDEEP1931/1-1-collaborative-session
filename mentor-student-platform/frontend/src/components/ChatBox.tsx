@@ -68,11 +68,11 @@ export default function ChatBox() {
       setIsLoading(true);
       const sanitizedMessage = input.trim();
 
-      socket.emit('chat-message', sanitizedMessage, (response: any) => {
+      socket.emit('chat-message', sanitizedMessage, (response: { success: boolean; error?: string }) => {
         if (response.success) {
           setInput('');
           setError(null);
-          setMessages((prev) => [...prev, response.data]);
+          //setMessages((prev) => [...prev, response.data]);
         } else {
           setError(response.error || 'Failed to send message');
         }
