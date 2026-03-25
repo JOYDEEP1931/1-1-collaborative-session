@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { initializeSocket, getSocket, disconnectSocket } from '../lib/socket';
+import React, { useEffect, useRef, useState } from "react";
+import { initializeSocket, getSocket, disconnectSocket } from "../lib/socket";
 import {
   initializeWebRTC,
   createOffer,
@@ -8,7 +8,7 @@ import {
   handleICECandidate,
   toggleMediaTrack,
   cleanupWebRTC,
-} from '../lib/webrtc';
+} from "../lib/webrtc";
 
 interface VideoCallProps {
   sessionId: string;
@@ -22,7 +22,7 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAudioOn, setIsAudioOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,17 +34,17 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
 
         const socket = initializeSocket(token);
 
-        socket.emit('join-session', sessionId, (response: any) => {
+        socket.emit("join-session", sessionId, (response: any) => {
           if (!response.success) {
-            if (isMounted) setError(response.error || 'Failed to join session');
+            if (isMounted) setError(response.error || "Failed to join session");
             return;
           }
-          if (isMounted) console.log('✅ Joined session:', sessionId);
+          if (isMounted) console.log("✅ Joined session:", sessionId);
         });
 
         if (!socket.connected) {
           await new Promise<void>((resolve) => {
-            socket.once('connect', () => resolve());
+            socket.once("connect", () => resolve());
           });
         }
 
@@ -55,52 +55,63 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
 
         await createOffer();
 
-        socket.on('webrtc-offer', async (data: any) => {
+        socket.on("webrtc-offer", async (data: any) => {
           try {
             const { offer } = data;
-            console.log('📨 Received offer');
+            console.log("📨 Received offer");
             await handleOffer(offer);
-            if (isMounted) setConnectionStatus('connected');
+            if (isMounted) setConnectionStatus("connected");
           } catch (err) {
-            console.error('Error handling offer:', err);
-            if (isMounted) setError('Failed to handle offer');
+            console.error("Error handling offer:", err);
+            if (isMounted) setError("Failed to handle offer");
           }
         });
 
-        socket.on('webrtc-answer', async (data: any) => {
+        socket.on("webrtc-answer", async (data: any) => {
           try {
             const { answer } = data;
-            console.log('📨 Received answer');
+            console.log("📨 Received answer");
             await handleAnswer(answer);
-            if (isMounted) setConnectionStatus('connected');
+            if (isMounted) setConnectionStatus("connected");
           } catch (err) {
-            console.error('Error handling answer:', err);
-            if (isMounted) setError('Failed to handle answer');
+            console.error("Error handling answer:", err);
+            if (isMounted) setError("Failed to handle answer");
           }
         });
 
-        socket.on('webrtc-candidate', async (data: any) => {
+        socket.on("webrtc-candidate", async (data: any) => {
           try {
             const { candidate } = data;
             await handleICECandidate(candidate);
           } catch (err) {
-            console.error('Error handling ICE candidate:', err);
+            console.error("Error handling ICE candidate:", err);
           }
         });
 
-        socket.on('user-joined', (data: any) => {
-          console.log('👤 User joined:', data.userId);
+        socket.on("user-joined", (data: any) => {
+          console.log("👤 User joined:", data.userId);
         });
 
-        socket.on('user-disconnected', (data: any) => {
-          console.log('👤 User disconnected:', data.userId);
-          if (isMounted) setConnectionStatus('disconnected');
+        socket.on("user-disconnected", (data: any) => {
+          console.log("👤 User disconnected:", data.userId);
+          if (isMounted) setConnectionStatus("disconnected");
+        });
+
+        socket.on("connection-status", (data: any) => {
+          console.log("🔌 Connection status:", data.state);
+          if (isMounted) {
+            if (data.state === "connected") {
+              setConnectionStatus("connected");
+            } else if (data.state === "failed" || data.state === "closed") {
+              setConnectionStatus("disconnected");
+            }
+          }
         });
       } catch (err) {
         if (isMounted) {
-          const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+          const errorMsg = err instanceof Error ? err.message : "Unknown error";
           setError(errorMsg);
-          console.error('Failed to initialize call:', err);
+          console.error("Failed to initialize call:", err);
         }
       }
     };
@@ -116,22 +127,22 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
 
   const handleToggleAudio = () => {
     const newState = !isAudioOn;
-    toggleMediaTrack('audio', newState);
+    toggleMediaTrack("audio", newState);
     setIsAudioOn(newState);
   };
 
   const handleToggleVideo = () => {
     const newState = !isVideoOn;
-    toggleMediaTrack('video', newState);
+    toggleMediaTrack("video", newState);
     setIsVideoOn(newState);
   };
 
   const handleEndCall = () => {
     const socket = getSocket();
     if (socket) {
-      socket.emit('leave-session', (response: any) => {
+      socket.emit("leave-session", (response: any) => {
         if (response.success) {
-          console.log('✅ Left session');
+          console.log("✅ Left session");
         }
       });
     }
@@ -165,7 +176,7 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-gray-900 bg-opacity-70 px-2 py-1 rounded text-sm text-white">
-            {connectionStatus === 'connected' ? 'Connected' : 'Waiting...'}
+            {connectionStatus === "connected" ? "Connected" : "Waiting..."}
           </div>
         </div>
       </div>
@@ -187,24 +198,24 @@ export default function VideoCall({ sessionId, token }: VideoCallProps) {
           onClick={handleToggleAudio}
           className={`p-3 rounded-full transition-colors text-xl ${
             isAudioOn
-              ? 'bg-blue-600 hover:bg-blue-700'
-              : 'bg-red-600 hover:bg-red-700'
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-red-600 hover:bg-red-700"
           }`}
           title="Toggle audio"
         >
-          {isAudioOn ? '🎤' : '🔇'}
+          {isAudioOn ? "🎤" : "🔇"}
         </button>
 
         <button
           onClick={handleToggleVideo}
           className={`p-3 rounded-full transition-colors text-xl ${
             isVideoOn
-              ? 'bg-blue-600 hover:bg-blue-700'
-              : 'bg-red-600 hover:bg-red-700'
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-red-600 hover:bg-red-700"
           }`}
           title="Toggle video"
         >
-          {isVideoOn ? '📹' : '📴'}
+          {isVideoOn ? "📹" : "📴"}
         </button>
 
         <button

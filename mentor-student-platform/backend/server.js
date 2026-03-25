@@ -11,7 +11,8 @@ const server = http.createServer(app);
 
 // ✅ SECURITY: Restrict CORS to trusted domains
 const allowedOrigins = (
-  process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:3000"
+  process.env.ALLOWED_ORIGINS ||
+  "http://localhost:5173,http://localhost:5174,http://localhost:3000"
 ).split(",");
 
 const io = new Server(server, {
@@ -40,7 +41,7 @@ io.use((socket, next) => {
   try {
     const user = jwt.verify(
       token,
-      process.env.JWT_SECRET || "your-secret-key-change-this"
+      process.env.JWT_SECRET || "your-secret-key-change-this",
     );
     socket.userId = user.id;
     socket.userRole = user.role; // 'mentor' or 'student'
@@ -66,7 +67,7 @@ function validateInput(data, maxLength = 10000) {
 
 io.on("connection", (socket) => {
   console.log(
-    `✅ User connected: ${socket.userId} (${socket.userRole}) - Socket: ${socket.id}`
+    `✅ User connected: ${socket.userId} (${socket.userRole}) - Socket: ${socket.id}`,
   );
 
   // ✅ Join session room
@@ -362,15 +363,13 @@ app.post("/api/auth/token", (req, res) => {
     const { id, name, role } = req.body;
 
     if (!id || !name || !role) {
-      return res
-        .status(400)
-        .json({ error: "Missing id, name, or role" });
+      return res.status(400).json({ error: "Missing id, name, or role" });
     }
 
     const token = jwt.sign(
       { id, name, role },
       process.env.JWT_SECRET || "your-secret-key-change-this",
-      { expiresIn: "24h" }
+      { expiresIn: "24h" },
     );
 
     res.json({ success: true, token });

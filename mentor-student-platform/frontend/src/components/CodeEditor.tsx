@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
-import Editor from '@monaco-editor/react';
-import { getSocket } from '../lib/socket';
+import React, { useEffect, useState, useRef } from "react";
+import Editor from "@monaco-editor/react";
+import { getSocket } from "../lib/socket";
 
 interface CodeUpdate {
   code: string;
@@ -11,17 +11,17 @@ interface CodeUpdate {
 }
 
 const SUPPORTED_LANGUAGES = [
-  'javascript',
-  'typescript',
-  'python',
-  'java',
-  'cpp',
-  'csharp',
-  'go',
-  'rust',
-  'html',
-  'css',
-  'sql',
+  "javascript",
+  "typescript",
+  "python",
+  "java",
+  "cpp",
+  "csharp",
+  "go",
+  "rust",
+  "html",
+  "css",
+  "sql",
 ];
 
 function throttle(func: Function, delay: number) {
@@ -36,8 +36,8 @@ function throttle(func: Function, delay: number) {
 }
 
 export default function CodeEditor() {
-  const [code, setCode] = useState('// Start coding...\n');
-  const [language, setLanguage] = useState('javascript');
+  const [code, setCode] = useState("// Start coding...\n");
+  const [language, setLanguage] = useState("javascript");
   const [error, setError] = useState<string | null>(null);
   const [isRemoteUpdate, setIsRemoteUpdate] = useState(false);
   const [lastUpdatedBy, setLastUpdatedBy] = useState<string | null>(null);
@@ -50,49 +50,66 @@ export default function CodeEditor() {
       const socket = getSocket();
       if (!socket) return;
 
-      socket.emit('code-update', codeData, (response: any) => {
+      socket.emit("code-update", codeData, (response: any) => {
         if (!response.success) {
-          setError(response.error || 'Failed to sync code');
+          setError(response.error || "Failed to sync code");
         } else {
           setError(null);
         }
       });
-    }, 500)
+    }, 500),
   ).current;
 
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+    // Retry getting socket if not available yet
+    let socket = getSocket();
+    let retries = 0;
+    const maxRetries = 10;
 
-    const handleCodeUpdate = (update: CodeUpdate) => {
-      setIsRemoteUpdate(true);
-      setCode(update.code);
-      setLanguage(update.language);
-      setLastUpdatedBy(update.userName);
-      setLastUpdateTime(new Date(update.timestamp).toLocaleTimeString());
-
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
+    const setupListener = () => {
+      socket = getSocket();
+      if (!socket && retries < maxRetries) {
+        retries++;
+        setTimeout(setupListener, 500);
+        return;
       }
-      updateTimeoutRef.current = setTimeout(() => {
-        setIsRemoteUpdate(false);
-      }, 100);
+
+      if (!socket) return;
+
+      const handleCodeUpdate = (update: CodeUpdate) => {
+        setIsRemoteUpdate(true);
+        setCode(update.code);
+        setLanguage(update.language);
+        setLastUpdatedBy(update.userName);
+        setLastUpdateTime(new Date(update.timestamp).toLocaleTimeString());
+
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+        }
+        updateTimeoutRef.current = setTimeout(() => {
+          setIsRemoteUpdate(false);
+        }, 100);
+      };
+
+      console.log("📝 Setting up code-update listener");
+      socket.on("code-update", handleCodeUpdate);
+
+      return () => {
+        socket?.off("code-update", handleCodeUpdate);
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+        }
+      };
     };
 
-    socket.on('code-update', handleCodeUpdate);
-
-    return () => {
-      socket.off('code-update', handleCodeUpdate);
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-    };
+    const cleanup = setupListener();
+    return cleanup;
   }, []);
 
   const handleCodeChange = (value: string | undefined) => {
     if (isRemoteUpdate) return;
 
-    const newCode = value || '';
+    const newCode = value || "";
     setCode(newCode);
     setError(null);
 
@@ -108,7 +125,7 @@ export default function CodeEditor() {
 
     const socket = getSocket();
     if (socket) {
-      socket.emit('code-update', {
+      socket.emit("code-update", {
         code: code,
         language: newLanguage,
       });
@@ -116,12 +133,12 @@ export default function CodeEditor() {
   };
 
   const handleClearCode = () => {
-    if (confirm('Are you sure? This will clear the code for both users.')) {
-      setCode('');
+    if (confirm("Are you sure? This will clear the code for both users.")) {
+      setCode("");
       const socket = getSocket();
       if (socket) {
-        socket.emit('code-update', {
-          code: '',
+        socket.emit("code-update", {
+          code: "",
           language: language,
         });
       }
@@ -132,15 +149,15 @@ export default function CodeEditor() {
     try {
       await navigator.clipboard.writeText(code);
       setError(null);
-      const el = document.getElementById('copy-feedback');
+      const el = document.getElementById("copy-feedback");
       if (el) {
-        el.style.display = 'block';
+        el.style.display = "block";
         setTimeout(() => {
-          el.style.display = 'none';
+          el.style.display = "none";
         }, 2000);
       }
     } catch (err) {
-      setError('Failed to copy code');
+      setError("Failed to copy code");
     }
   };
 
@@ -156,16 +173,14 @@ export default function CodeEditor() {
               className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors flex items-center gap-1"
               title="Copy code"
             >
-              📋
-              Copy
+              📋 Copy
             </button>
             <button
               onClick={handleClearCode}
               className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors flex items-center gap-1"
               title="Clear code"
             >
-              🗑️
-              Clear
+              🗑️ Clear
             </button>
           </div>
         </div>
@@ -189,7 +204,8 @@ export default function CodeEditor() {
         {/* Status Info */}
         {lastUpdatedBy && (
           <div className="mt-2 text-xs text-gray-400">
-            Last updated by: <span className="text-gray-300">{lastUpdatedBy}</span>
+            Last updated by:{" "}
+            <span className="text-gray-300">{lastUpdatedBy}</span>
             {lastUpdateTime && <span> at {lastUpdateTime}</span>}
           </div>
         )}
@@ -205,7 +221,7 @@ export default function CodeEditor() {
       {/* Copy Feedback */}
       <div
         id="copy-feedback"
-        style={{ display: 'none' }}
+        style={{ display: "none" }}
         className="px-4 py-2 bg-green-500 bg-opacity-20 border-b border-green-500 text-green-200 text-sm"
       >
         ✅ Code copied to clipboard!
@@ -224,11 +240,11 @@ export default function CodeEditor() {
           theme="vs-dark"
           options={{
             minimap: { enabled: false },
-            wordWrap: 'on',
+            wordWrap: "on",
             fontSize: 14,
             tabSize: 2,
-            autoClosingBrackets: 'always',
-            autoClosingQuotes: 'always',
+            autoClosingBrackets: "always",
+            autoClosingQuotes: "always",
             formatOnPaste: true,
             scrollBeyondLastLine: false,
           }}
