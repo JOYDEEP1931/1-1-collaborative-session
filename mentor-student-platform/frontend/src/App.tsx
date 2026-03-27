@@ -14,7 +14,6 @@ function App() {
   const [joinSessionId, setJoinSessionId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
   const [socketReady, setSocketReady] = useState(false);
   // 🔴 VERY IMPORTANT — JOIN SESSION HERE
   useEffect(() => {
