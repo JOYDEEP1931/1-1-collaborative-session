@@ -9,7 +9,6 @@ import {
   toggleMediaTrack,
   cleanupWebRTC,
 } from "../lib/webrtc";
-
 interface VideoCallProps {
   sessionId: string;
   token: string;
