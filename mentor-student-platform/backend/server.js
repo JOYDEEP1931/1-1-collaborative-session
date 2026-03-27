@@ -5,7 +5,6 @@ const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
-
 const app = express();
 const server = http.createServer(app);
 
