@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import { getSocket } from "../lib/socket";
-
 interface CodeUpdate {
   code: string;
   language: string;

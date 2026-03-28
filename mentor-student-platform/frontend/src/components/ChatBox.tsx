@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { getSocket } from "../lib/socket";
-
 interface Message {
   id: string;
   userId: string;
