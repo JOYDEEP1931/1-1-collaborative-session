@@ -10,9 +10,8 @@ const server = http.createServer(app);
 
 // ✅ SECURITY: Restrict CORS to trusted domains
 const allowedOrigins = (
-  process.env.ALLOWED_ORIGINS ||
-  "https://one-1-collaborative-session.onrender.com/api/sessions,https://one-1-collaborative-session.onrender.com/api/sessions,https://one-1-collaborative-session.onrender.com/api/sessions"
-).split(",");
+  process.env.ALLOWED_ORIGINS ||"*"
+);
 
 const io = new Server(server, {
   cors: {

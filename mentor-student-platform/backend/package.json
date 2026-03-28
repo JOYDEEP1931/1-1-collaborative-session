@@ -8,7 +8,12 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["mentoring", "collaboration", "webrtc", "socket.io"],
+  "keywords": [
+    "mentoring",
+    "collaboration",
+    "webrtc",
+    "socket.io"
+  ],
   "author": "",
   "license": "MIT",
   "type": "commonjs",
