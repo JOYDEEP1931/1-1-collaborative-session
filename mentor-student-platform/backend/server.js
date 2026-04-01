@@ -436,7 +436,7 @@ const corsOptions = {
 
 // ✅ Apply CORS properly
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // preflight fix
+app.options(/(.*)/, cors(corsOptions)); // preflight fix
 
 app.use(express.json());
 
