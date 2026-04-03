@@ -15,6 +15,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
+  // const API_BASE = "https://one-1-collaborative-session.onrender.com";
   // 🔴 VERY IMPORTANT — JOIN SESSION HERE
   useEffect(() => {
   if (!token || !sessionId) return;
