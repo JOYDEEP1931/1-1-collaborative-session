@@ -4,7 +4,7 @@ let socket: Socket | null = null;
 
 export const initializeSocket = (token: string) => {
   if (!socket) {
-    socket = io("http://localhost:3001", {
+    socket = io("https://one-1-collaborative-session-2.onrender.com", {
       auth: { token },
       transports: ["websocket"],
     });

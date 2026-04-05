@@ -57,6 +57,7 @@ function App() {
       let newSessionId = sessionId;
       if (role === 'mentor' && !sessionId) {
         const sessionRes = await axios.post(`${apiUrl}/api/sessions`);
+        console.log("Session created:", sessionRes.data);
         newSessionId = sessionRes.data.sessionId;
         setSessionId(newSessionId);
       }
